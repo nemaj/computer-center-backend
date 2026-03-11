@@ -13,7 +13,18 @@ exports.createCustomer = async (req, res) => {
 // READ ALL
 exports.getCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find();
+    const search = req.query.search;
+    const filter = search
+      ? {
+          $or: [
+            { accountNumber: { $regex: search, $options: "i" } },
+            { firstName: { $regex: search, $options: "i" } },
+            { lastName: { $regex: search, $options: "i" } },
+            { address: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+    const customers = await Customer.find(filter);
     res.json(customers);
   } catch (error) {
     res.status(500).json({ message: error.message });
