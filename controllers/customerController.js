@@ -39,6 +39,9 @@ exports.createCustomer = async (req, res) => {
 
 // READ ALL
 exports.getCustomers = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 5;
+
   try {
     const search = req.query.search;
     const filter = search
@@ -51,8 +54,18 @@ exports.getCustomers = async (req, res) => {
           ],
         }
       : {};
-    const customers = await Customer.find(filter);
-    res.json(customers.map(snakeToCamel));
+    const customers = await Customer.find(filter)
+      .sort({ _id: 1 }) // newest first
+      .skip((page - 1) * limit)
+      .limit(limit);
+    const total = await Customer.countDocuments();
+
+    res.json({
+      page,
+      totalpages: Math.ceil(total / limit),
+      totalCount: total,
+      customers: customers.map(snakeToCamel),
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
