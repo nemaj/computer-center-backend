@@ -3,7 +3,6 @@ const Customer = require("../models/Customer");
 function camelToSnake(data) {
   return {
     account_number: (data.accountNumber ?? "").toUpperCase(),
-    due_date: data.dueDate,
     last_name: (data.lastName ?? "").toUpperCase(),
     first_name: (data.firstName ?? "").toUpperCase(),
     middle_name: (data.middleName ?? "").toUpperCase(),
@@ -16,7 +15,6 @@ function snakeToCamel(data) {
   return {
     id: data._id,
     accountNumber: data.account_number,
-    dueDate: data.due_date,
     lastName: data.last_name,
     firstName: data.first_name,
     middleName: data.middle_name,
@@ -43,7 +41,7 @@ exports.getCustomers = async (req, res) => {
   const limit = parseInt(req.query.limit) || 5;
 
   try {
-    const search = req.query.search;
+    const search = req.query.search || "";
     const filter = search
       ? {
           $or: [

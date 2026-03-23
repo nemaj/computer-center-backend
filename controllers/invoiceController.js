@@ -3,10 +3,75 @@ const Subscription = require("../models/Subscription");
 const Plan = require("../models/Plan");
 const { format } = require("date-fns");
 
+function snakeToCamel(data) {
+  return {
+    id: data._id,
+    subscriptionId: data.subscription_id,
+    invoiceDate: data.invoice_date,
+    dueDate: data.due_date,
+    totalAmount: data.total_amount,
+    status: data.status,
+    payments: data.payments.map((_payment) => ({
+      id: _payment._id,
+      invoiceId: _payment.invoice_id,
+      amountPaid: _payment.amount_paid,
+      paymentDate: _payment.payment_date,
+    })),
+  };
+}
+
+// GET INVOICE
+exports.getInvoices = async (req, res) => {
+  try {
+    const subscriptionId = req.query.subscriptionId;
+    // const invoices = await Invoice.find({
+    //   subscription_id: subscriptionId,
+    //   status: { $ne: "paid", $exists: true },
+    // });
+
+    const invoices = await Invoice.aggregate([
+      {
+        // Step 1: Filter unpaid + partially paid invoices
+        $match: {
+          subscription_id: subscriptionId,
+          status: { $in: ["unpaid", "partially_paid"] },
+        },
+      },
+      {
+        $addFields: {
+          invoiceId: { $toString: "$_id" },
+        },
+      },
+      {
+        // Step 2: Join payments collection
+        $lookup: {
+          from: "payments",
+          localField: "invoiceId",
+          foreignField: "invoice_id",
+          as: "payments",
+        },
+      },
+      {
+        // Step 3 (optional): Sort invoices by date
+        $sort: {
+          invoice_date: -1,
+        },
+      },
+    ]);
+
+    if (invoices) res.json(invoices.map(snakeToCamel));
+    else res.json([]);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // CREATE INVOICES
 exports.generateInvoice = async (req, res) => {
   try {
     const date = new Date();
+    const startOfThisMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const formatted = startOfThisMonth.toISOString().split("T")[0];
 
     const invoices = await Invoice.countDocuments({
       $or: [
@@ -22,7 +87,12 @@ exports.generateInvoice = async (req, res) => {
     if (invoices <= 0) {
       const subscriptions = await Subscription.aggregate([
         {
-          $match: { status: "active" },
+          $match: {
+            status: "active",
+            start_date: {
+              $lt: formatted,
+            },
+          },
         },
         {
           $addFields: {
@@ -48,12 +118,17 @@ exports.generateInvoice = async (req, res) => {
           },
         },
       ]);
-      const datas = subscriptions.map((subs) => ({
-        subscription_id: subs._id,
-        invoice_date: format(new Date(), "yyyy-MM-dd"),
-        due_date: subs.start_date,
-        total_amount: subs.plan.price,
-      }));
+      const datas = subscriptions.map((subs) => {
+        const dueDay = format(new Date(subs.start_date), "dd");
+        const month = format(new Date(), "yyyy-MM");
+
+        return {
+          subscription_id: subs._id,
+          invoice_date: format(new Date(), "yyyy-MM-dd"),
+          due_date: `${month}-${dueDay}`,
+          total_amount: subs.plan.price,
+        };
+      });
       const results = await Invoice.insertMany(datas);
       res.json(results);
       return;

@@ -6,7 +6,6 @@ const CustomerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    due_date: String,
     last_name: String,
     first_name: String,
     middle_name: String,
