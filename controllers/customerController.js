@@ -38,7 +38,7 @@ exports.createCustomer = async (req, res) => {
 // READ ALL
 exports.getCustomers = async (req, res) => {
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 5;
+  const limit = parseInt(req.query.limit) || 10;
 
   try {
     const search = req.query.search || "";
